@@ -108,7 +108,7 @@ bool checkfire()
 
 
 
-// the loop function runs over and over again forever
+/////////////////////////RADIO + GPS FUNCTIONS BELOW
 void txgpsproblem() {
   checkleak();
   digitalWrite(13, HIGH);   // turn the LED on (HIGH is the voltage level)
@@ -149,6 +149,7 @@ void TXgps()
   Serial.println();
   delay(5000);
 }
+//////////////////////LOOP
 void loop() {
   while (Serial1.available() > 0) {
     if (gps.encode(Serial1.read())) {
