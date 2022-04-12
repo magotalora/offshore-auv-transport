@@ -111,6 +111,7 @@ bool checkfire()
 
 /////////////////////////RADIO + GPS FUNCTIONS BELOW
 void txgpsproblem() {
+  checkfire()
   checkleak();
   digitalWrite(13, HIGH);   // turn the LED on (HIGH is the voltage level)
   String str = "";
@@ -133,6 +134,7 @@ void txgpsproblem() {
 }
 void TXgps()
 {
+  checkfire()
   checkleak();
   gps.f_get_position(&lat, &lon);
   gps.crack_datetime(&year, &month, &day, &hour, &minute, &second, &hundredths);
