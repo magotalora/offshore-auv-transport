@@ -1,15 +1,9 @@
-#include "SoftwareSerial.h"
-
 #include "cc1000.h"
-#include <TinyGPS++.h>
-
-int RXPin = 7;
-int TXPin = 6;
-
-TinyGPSPlus gps;
-SoftwareSerial SerialGPS(RXPin, TXPin);
-
-//create cc1000 trx object
+#include <TinyGPS.h>
+float lat, lon;
+int year;
+byte month, day, hour, minute, second, hundredths;
+TinyGPS gps;
 Cc1000 trx;
 
 // the setup function runs once when you press reset or power the board
@@ -41,10 +35,9 @@ void txsetup() {
   //trx.set_trx_mode(PD_MODE);
 
 }
-
 void setup() {
   Serial.begin(9600);
-  SerialGPS.begin(9600);
+  Serial1.begin(9600);
   txsetup();
 }
 // the loop function runs over and over again forever
@@ -66,38 +59,28 @@ void txgpsproblem() {
   digitalWrite(13, LOW);    // turn the LED off by making the voltage LOW
   delay(3000);
 }
-
-
-
 void TXgps()
 {
-  String str = " ";
-  if (gps.location.isValid())
-  {
-    str = str + "$$$$$$$$ @@@@@@@@ ######## $$$$$$$$"
-          + "Latitude: " + (gps.location.lat(), 6)
-          + "Longitude: " + (gps.location.lng(), 6)
-          + "Altitude: " + gps.altitude.meters();
-  }
-  else
-  {
-    str = "$$$$$$$$$ @@@@@@@@@@ Location is not available";
-  }
+  gps.f_get_position(&lat, &lon);
+  gps.crack_datetime(&year, &month, &day, &hour, &minute, &second, &hundredths);
+  String str = "constanin is piuking on adam's pillow ";
+  str = str + "$$$$$$$$ @@@@@@@@ ######## $$$$$$$$" + "Latitude: " + String(lat, 6) + "Longitude: " + String(lon, 6);
   Serial.write((char*)str.c_str());
   trx.send_data(str);
   trx.set_trx_mode(TX_MODE);
   Serial.println();
   delay(5000);
 }
-
 void loop() {
-  while (SerialGPS.available() > 0)
-    if (gps.encode(SerialGPS.read()))
+  while (Serial1.available() > 0) {
+    if (gps.encode(Serial1.read())) {
       TXgps();
-  if (millis() > 5000 && gps.charsProcessed() < 10)
-  {
-    txgpsproblem();
-    while (true);
+      if ((millis() > 5000) && String(lon,6).length()<7 && String(lat,6).length()<7)
+      {
+        txgpsproblem();
+        while (true);
+      }
+      delay(3000);
+    }
   }
-  delay(3000);
 }
