@@ -67,10 +67,10 @@ void setup() {
 
 bool checkleak()
 {
-  if (digitalRead(capteur_D) == LOW) {
+  if (digitalRead(leakdigital) == LOW) {
     Serial.println("Digital value : wet"); 
     return true;
-    delay (10)
+    delay (10);
   } else {
     Serial.println("Digital value : dry");
     return false;
@@ -80,8 +80,8 @@ bool checkleak()
 bool checkfire()
 {
     //Read data and store it to variables hum and temp
-    hum = dht.readHumidity();
-    temp= dht.readTemperature();
+    int hum = dht.readHumidity();
+    int temp= dht.readTemperature();
     //Print temp and humidity values to serial monitor
     Serial.print("Humidity: ");
     Serial.print(hum);
@@ -100,7 +100,7 @@ bool checkfire()
   if (digitalRead(temp) >= 70) {
     Serial.println("Fire on board"); 
     return true;
-    delay (10)
+    delay (10);
   } else {
     Serial.println("No fire on board");
     return false;
@@ -111,7 +111,7 @@ bool checkfire()
 
 /////////////////////////RADIO + GPS FUNCTIONS BELOW
 void txgpsproblem() {
-  checkfire()
+  checkfire();
   checkleak();
   digitalWrite(13, HIGH);   // turn the LED on (HIGH is the voltage level)
   String str = "";
@@ -120,10 +120,10 @@ void txgpsproblem() {
         + " Frequency: " + trx.get_frequency() + "Hz"
         + " $$$$$$$$\n";
     if (checkleak()==true){
-    str = str + "Leak on board %#$$#$#$#$##$  "
+    str = str + "Leak on board %#$$#$#$#$##$  ";
     }
     if (checkfire()==true){
-    str = str + "Fire on board %#$$#$#$#$##$  "
+    str = str + "Fire on board %#$$#$#$#$##$  ";
   }
   Serial.write((char*)str.c_str());
   trx.send_data(str);
@@ -134,17 +134,17 @@ void txgpsproblem() {
 }
 void TXgps()
 {
-  checkfire()
+  checkfire();
   checkleak();
   gps.f_get_position(&lat, &lon);
   gps.crack_datetime(&year, &month, &day, &hour, &minute, &second, &hundredths);
   String str = " ";
   str = str + "$$$$$$$$ @@@@@@@@ ######## $$$$$$$$" + "Latitude: " + String(lat, 6) + "Longitude: " + String(lon, 6);
   if (checkleak()==true){
-    str = str + "Leak on board %#$$#$#$#$##$"
+    str = str + "Leak on board %#$$#$#$#$##$";
   }
   if (checkfire()==true){
-    str = str + "Fire on board %#$$#$#$#$##$  "
+    str = str + "Fire on board %#$$#$#$#$##$  ";
   }  
   Serial.write((char*)str.c_str());
   trx.send_data(str);
