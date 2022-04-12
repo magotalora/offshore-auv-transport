@@ -4,8 +4,8 @@ Atonomous navigation system for Arduino, different sensors (IMU, GPS, pressure, 
 The project is divided into two subsystems:
 * Safety System
 
-Responsible of keeping the system safe by tracking temperature and presence of water, and also for via the radio with onshore.
+  Responsible of keeping the system safe by tracking temperature and presence of water, and also for via the radio with onshore.
 
 * Navigation System
 
-Takes de necessary decisions for the AUV to navigate, by reading the location and orientation, compute the route to the determined destination, and activating the five motors.
+  Takes de necessary decisions for the AUV to navigate, by reading the location and orientation, compute the route to the determined destination, and activating the five motors.
