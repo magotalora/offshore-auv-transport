@@ -1,6 +1,50 @@
-#include "cc1000.h"
-#include <TinyGPS.h>
-#include <DHT.h>
+ /*Safety system module
+   Note: at some point we need to move the GPS to the other module
+   
+                                  +---+   +---+
+                   +----[PWR]-----|USB|---|USB|----+
+                   |              +---+   +---+    |
+                   |    GND/RST2 [ ][ ]     SCL[ ] |
+                   |  MOSI2/SCK2 [ ][ ]     SDA[ ] |
+                   |    5V/MISO2 [ ][ ]    AREF[ ] |
+                   |                        GND[ ] |
+                   | [ ]N/C                  13[ ]~|
+                   | [ ]IOREF                12[ ]~|
+                   | [ ]RST                  11[ ]~|
+   Radio J2(4) VCC | [X]3V3   +----------+   10[ ]~|
+           GPS VCC | [X]5v    | Arduino  |    9[ ]~|
+   Radio J2(6) GND | [X]GND   |   Due    |    8[ ]~|
+           GPS GND | [X]GND   +----------+         |
+                   | [ ]Vin                   7[ ]~|
+                   |                          6[ ]~|
+          Radio PA | [X]A0                    5[ ]~|
+          Radio PD | [X]A1                    4[ ]~|
+          Radio PC | [X]A2               INT5/3[ ]~|
+         Radio CLK | [X]A3               INT4/2[ ]~|
+         Radio DIO | [X]A4                 TX>1[ ]~|
+         Radio CHP | [X]A5                 RX<0[ ]~|
+  Radio J2(5) RSSI | [X]A6                         |
+                   | [ ]A7               TX3/14[ ] |
+                   |                     RX3/15[ ] |
+                   | [ ]A8               TX2/16[ ] | 
+                   | [ ]A9               RX2/17[ ] |
+                   | [ ]A10         TX1/INT3/18[X] | GPS RX
+                   | [ ]A11         RX1/INT2/19[X] | GPS TX
+                   | [ ]A12     I2C-SDA/INT1/20[ ] |
+                   | [ ]A13     I2C-SCL/INT0/21[ ] |
+                   | [ ]A14                        |
+                   | [ ]A15                        |
+                   |          RST SCK MISO         |
+                   |     ICSP [ ] [ ] [ ]          |
+                   |          [ ] [ ] [ ]          |
+                   |          GND MOSI 5V          |
+                   |                   ____________/
+                    \_________________/     
+*/
+
+#include "cc1000.h" //Library for the Radio commmunications
+#include <TinyGPS.h> //Library for GPS
+#include <DHT.h> //Library for the temperature sensor
 float lat, lon;
 int year;
 byte month, day, hour, minute, second, hundredths;
