@@ -48,6 +48,7 @@
 float lat, lon;
 int year;
 byte month, day, hour, minute, second, hundredths;
+float firetemp = 70; //Maximum allowed temperature in the system
 TinyGPS gps;
 Cc1000 trx;
 
@@ -146,7 +147,7 @@ bool checkfire()
     Serial.print(temp);
     Serial.println(" Celsius");
 
-  if (digitalRead(temp) >= 70) {
+  if (digitalRead(temp) >= firetemp) {
     Serial.println("Fire on board"); 
     return true;
     delay (10);
