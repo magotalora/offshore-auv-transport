@@ -1,4 +1,4 @@
- /*Safety system module
+/*Safety system module
    Note: at some point we need to move the GPS to the other module
    
                                   +---+   +---+
@@ -51,7 +51,10 @@ byte month, day, hour, minute, second, hundredths;
 TinyGPS gps;
 Cc1000 trx;
 
-const int leakdigital = 4; // leak pin
+const int leakdigital = 12; // leak pin
+const int leakVCC = 13; // leak pin
+
+
 
 #define DHTPIN 7     // what pin we're connected to
 #define DHTTYPE DHT22   // DHT 22  (AM2302)
@@ -62,6 +65,8 @@ DHT dht(DHTPIN, DHTTYPE); //// Initialize DHT sensor for normal 16mhz Arduino
 
 
 void leaksetup(){
+  pinMode(leakVCC, OUTPUT);
+  digitalWrite(leakVCC, HIGH); 
   pinMode(leakdigital, INPUT);
 }
 
@@ -198,15 +203,13 @@ void TXgps()
 }
 //////////////////////LOOP
 void loop() {
-  while (Serial1.available() > 0) {
-    if (gps.encode(Serial1.read())) {
+  if (Serial1.available() > 0 && (millis() <= 5000) && (String(lon,6).length()>=7) && (String(lat,6).length()>=7 && gps.encode(Serial1.read())))
+      {
       TXgps();
-      if ((millis() > 5000) && String(lon,6).length()<7 && String(lat,6).length()<7)
+      }
+      else
       {
         txgpsproblem();
-        while (true);
       }
       delay(3000);
     }
-  }
-}
