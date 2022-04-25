@@ -88,19 +88,6 @@ void txsetup() {
   trx.set_frequency(432920000);
   //trx.set_frequency(432920000, VCO_AB, true);
   trx.set_trx_mode(TX_MODE);
-  Serial.write(" test.\n");
-  Serial.write("modem mode:");
-  Serial.print(trx.get_modem_mode(), DEC);
-  Serial.write(" power: ");
-  Serial.print(trx.get_power(), DEC);
-  Serial.write(" deviation: ");
-  Serial.print(trx.get_deviation(), DEC);
-  Serial.write(" bitrate: ");
-  Serial.print(trx.get_bitrate(), DEC);
-  Serial.write(" frequency: ");
-  Serial.print(trx.get_frequency(), DEC);
-  Serial.write("\n");
-  //trx.set_trx_mode(PD_MODE);
 
 }
 void setup() {
@@ -130,16 +117,8 @@ bool checkfire()
 {
     //Read data and store it to variables hum and temp
     int hum = dht.readHumidity();
-    int temp= dht.readTemperature();
+    int temp = dht.readTemperature();
     //Print temp and humidity values to serial monitor
-    Serial.print("Humidity: ");
-    Serial.print(hum);
-    Serial.print(" %, Temp: ");
-    Serial.print(temp);
-    Serial.println(" Celsius");
-    delay(1000); ///// double check
-    hum = dht.readHumidity();
-    temp= dht.readTemperature();
     Serial.print("Humidity: ");
     Serial.print(hum);
     Serial.print(" %, Temp: ");
