@@ -13,7 +13,7 @@ int state = 1; //Data to be sent in case (a)
 char string[12] = "Hola Hubert!"; //String to be sent in case (b)
 
 void setup() {
-  Serial3.begin(115200); //Start communication with the Arduino Due
+  Serial.begin(115200); //Start communication with the Arduino Due
   pinMode(LED_BUILTIN, OUTPUT); //Set LED on pin 13 as output
 }
 
@@ -23,11 +23,12 @@ void loop() {
     if (mode=='a') {
         state = !state;
         delay(500);
-        Serial3.write(state);
+        Serial.write(state);
         digitalWrite(LED_BUILTIN, state);
         delay(500);
     // Case (b): Send a 12-byte chain of text through Serial3
     } else if (mode=='b'){
-        Serial3.write(string,12);
+        Serial.write(string,12);
     }
+    delay(10000);
 }
