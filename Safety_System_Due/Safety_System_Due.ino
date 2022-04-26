@@ -1,3 +1,4 @@
+
 /*Safety system module
    Note: at some point we need to move the GPS to the other module
    
@@ -43,13 +44,11 @@
 */
 
 #include "cc1000.h" //Library for the Radio commmunications
-#include <TinyGPS.h> //Library for GPS
 #include <DHT.h> //Library for the temperature sensor
-float lat, lon;
-int year;
-byte month, day, hour, minute, second, hundredths;
+#include <TinyGPSPlus.h>
+
 float firetemp = 70; //Maximum allowed temperature in the system
-TinyGPS gps;
+TinyGPSPlus gps;
 Cc1000 trx;
 
 const int leakdigital = 12; // leak pin
@@ -89,19 +88,6 @@ void txsetup() {
   trx.set_frequency(432920000);
   //trx.set_frequency(432920000, VCO_AB, true);
   trx.set_trx_mode(TX_MODE);
-  Serial.write(" test.\n");
-  Serial.write("modem mode:");
-  Serial.print(trx.get_modem_mode(), DEC);
-  Serial.write(" power: ");
-  Serial.print(trx.get_power(), DEC);
-  Serial.write(" deviation: ");
-  Serial.print(trx.get_deviation(), DEC);
-  Serial.write(" bitrate: ");
-  Serial.print(trx.get_bitrate(), DEC);
-  Serial.write(" frequency: ");
-  Serial.print(trx.get_frequency(), DEC);
-  Serial.write("\n");
-  //trx.set_trx_mode(PD_MODE);
 
 }
 void setup() {
@@ -131,16 +117,8 @@ bool checkfire()
 {
     //Read data and store it to variables hum and temp
     int hum = dht.readHumidity();
-    int temp= dht.readTemperature();
+    int temp = dht.readTemperature();
     //Print temp and humidity values to serial monitor
-    Serial.print("Humidity: ");
-    Serial.print(hum);
-    Serial.print(" %, Temp: ");
-    Serial.print(temp);
-    Serial.println(" Celsius");
-    delay(1000); ///// double check
-    hum = dht.readHumidity();
-    temp= dht.readTemperature();
     Serial.print("Humidity: ");
     Serial.print(hum);
     Serial.print(" %, Temp: ");
@@ -159,37 +137,19 @@ bool checkfire()
 
 
 
-/////////////////////////RADIO + GPS FUNCTIONS BELOW
-void txgpsproblem() {
-  checkfire();
-  checkleak();
-  digitalWrite(13, HIGH);   // turn the LED on (HIGH is the voltage level)
-  String str = "";
-  str = str + "$$$$$$$$ @@@@@@@@ ######## $$$$$$$$ "
-        + "GPS not detected"
-        + " Frequency: " + trx.get_frequency() + "Hz"
-        + " $$$$$$$$\n";
-    if (checkleak()==true){
-    str = str + "Leak on board %#$$#$#$#$##$  ";
-    }
-    if (checkfire()==true){
-    str = str + "Fire on board %#$$#$#$#$##$  ";
-  }
-  Serial.write((char*)str.c_str());
-  trx.send_data(str);
-  trx.set_trx_mode(TX_MODE);
-
-  digitalWrite(13, LOW);    // turn the LED off by making the voltage LOW
-  delay(3000);
-}
+/////////////////////////RADIO + GPS FUNCTION
 void TXgps()
 {
   checkfire();
   checkleak();
-  gps.f_get_position(&lat, &lon);
-  gps.crack_datetime(&year, &month, &day, &hour, &minute, &second, &hundredths);
   String str = " ";
-  str = str + "$$$$$$$$ @@@@@@@@ ######## $$$$$$$$" + "Latitude: " + String(lat, 6) + "Longitude: " + String(lon, 6);
+  if (gps.location.isValid())
+  {
+  str = str + "$$$$$$$$ @@@@@@@@ ######## $$$$$$$$" + "Latitude: " + String(gps.location.lat(), 6) + "Longitude: " + String(gps.location.lng(), 6);
+  } else 
+  {
+    str = str + "%$%$%$%$ Gps invalid ##@#@#@#";
+  }
   if (checkleak()==true){
     str = str + "Leak on board %#$$#$#$#$##$";
   }
@@ -200,17 +160,12 @@ void TXgps()
   trx.send_data(str);
   trx.set_trx_mode(TX_MODE);
   Serial.println();
-  delay(5000);
+  delay(1000);
 }
 //////////////////////LOOP
 void loop() {
-  if (Serial1.available() > 0 && (millis() <= 5000) && (String(lon,6).length()>=7) && (String(lat,6).length()>=7 && gps.encode(Serial1.read())))
-      {
+  while (Serial1.available() > 0)
+    if (gps.encode(Serial1.read()))
       TXgps();
-      }
-      else
-      {
-        txgpsproblem();
-      }
-      delay(3000);
+      delay(1000);
     }
