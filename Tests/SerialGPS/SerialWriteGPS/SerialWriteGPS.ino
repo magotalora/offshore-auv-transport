@@ -1,5 +1,6 @@
 /*This file is part of a code test for the serial communication function between
   two Arduinos. This is the code for the sender. We are testing for sending a string of text
+  with the Latitude and Logitude from the GPS.
       
   Code uses Serial3, PINS 14(TX3) and 15(RX3).
 */

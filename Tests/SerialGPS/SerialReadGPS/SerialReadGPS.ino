@@ -1,5 +1,6 @@
-/*This file is part of a code test for the serial communication function between
-  an two Arduinos. This is the code for the receiver. We are testing for receiving a string of text.
+/*This file is part of a code test for the serial communication function between two Arduinos.
+  This is the code for the receiver. We are testing for receiving a string of text, and turning it
+  into the two float values for Latitude and Logitude of the GPS.
       
   Code uses Serial3, PINS 14(TX3) and 15(RX3). 
 */
