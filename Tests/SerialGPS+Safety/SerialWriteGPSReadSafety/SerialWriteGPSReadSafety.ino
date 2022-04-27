@@ -17,6 +17,7 @@ bool leakDetected;
 void setup()
 {
   Serial3.begin(115200); //Start communication with the other Arduino
+  Serial.begin(9600); //Start communication with the computer
 }
 
 void loop() {
@@ -49,8 +50,9 @@ void serialWriteGPS(float gpsLat, float gpsLong) {
 
 
 void SerialReadSafety() {
+        char serialMessage[]= {0};
         //Variable to store the string to be received
-        char serialMessage[14];
+        serialMessage[15];
         //Read message from the other Arduino
         Serial3.readBytes(serialMessage,14);
         //Turns the string into a float starting after "Temp:"
@@ -62,7 +64,7 @@ void SerialReadSafety() {
 
          //For debugging
          Serial.println("-----Serial communication:-----");
-         //Serial.print("Message received:");
+         Serial.print("Message received:");
          Serial.println(serialMessage);
          Serial.print("tempExceeded=");
          Serial.print(tempExceeded);
