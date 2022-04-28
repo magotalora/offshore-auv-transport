@@ -368,14 +368,6 @@ void txsetup() {
   trx.set_trx_mode(TX_MODE);
 
 }
-void setup() {
-  Serial.begin(9600);
-  Serial1.begin(9600);
-  txsetup();
-  leaksetup();
-  dhtsetup();
-}
-
 
 //////////////// FUNCTIONS OF SENSORS BELOW
 
