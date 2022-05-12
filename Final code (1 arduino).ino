@@ -1,44 +1,44 @@
- /*Safety system module
-                                +-----+
-         +----[PWR]-------------| USB |--+
-         |    GND/RST2 [ ][ ]   +-----+  |
-         |  MOSI2/SCK2 [ ][ ]     SCL[ ] |
-         |    5V/MISO2 [ ][ ]     SDA[ ] |
-         |                       AREF[ ] |
-         |                        GND[ ] |
-         | [ ]N/C                  13[ ]~|
-         | [ ]IOREF                12[ ]~|
-         | [ ]RST                  11[ ]~|
-         | [ ]3V3   +----------+   10[ ]~|
-         | [ ]5v    | Arduino  |    9[ ]~|
-         | [ ]GND   |    DUE   |    8[ ]~|
-         | [ ]GND   +----------+         |
-         | [ ]Vin                   7[ ]~|
-         |                          6[ ]~|
-         | [ ]A0                    5[ ]~|
-         | [ ]A1                    4[ ]~|
-         | [ ]A2               INT5/3[ ]~|
-         | [ ]A3               INT4/2[ ]~|
-         | [ ]A4                 TX>1[ ]~|
-         | [ ]A5                 RX<0[ ]~|
-         | [ ]A6                         |
-         | [ ]A7               TX3/14[ ] |
-         |                     RX3/15[ ] |
-         | [ ]A8               TX2/16[ ] |
-         | [ ]A9               RX2/17[ ] |
-         | [ ]A10         TX1/INT3/18[ ] |
-         | [ ]A11         RX1/INT2/19[ ] |
-         | [ ]A12     I2C-SDA/INT1/20[ ] |
-         | [ ]A13     I2C-SCL/INT0/21[ ] |
-         | [ ]A14                        |
-         | [ ]A15                        |
-         |          RST SCK MISO         |
-         |     ICSP [ ] [ ] [ ]          |
-         |          [ ] [ ] [ ]          |
-         |          GND MOSI 5V          |
-         |                               |
-         |     2560          ____________/
-          \_________________/
+/*Safety system module
+                               +-----+
+        +----[PWR]-------------| USB |--+
+        |    GND/RST2 [ ][ ]   +-----+  |
+        |  MOSI2/SCK2 [ ][ ]     SCL[ ] |
+        |    5V/MISO2 [ ][ ]     SDA[ ] |
+        |                       AREF[ ] |
+        |                        GND[ ] |
+        | [ ]N/C                  13[ ]~|
+        | [ ]IOREF                12[ ]~|
+        | [ ]RST                  11[ ]~|
+        | [ ]3V3   +----------+   10[ ]~|
+        | [ ]5v    | Arduino  |    9[ ]~|
+        | [ ]GND   |    DUE   |    8[ ]~|
+        | [ ]GND   +----------+         |
+        | [ ]Vin                   7[ ]~|
+        |                          6[ ]~|
+        | [ ]A0                    5[ ]~|
+        | [ ]A1                    4[ ]~|
+        | [ ]A2               INT5/3[ ]~|
+        | [ ]A3               INT4/2[ ]~|
+        | [ ]A4                 TX>1[ ]~|
+        | [ ]A5                 RX<0[ ]~|
+        | [ ]A6                         |
+        | [ ]A7               TX3/14[ ] |
+        |                     RX3/15[ ] |
+        | [ ]A8               TX2/16[ ] |
+        | [ ]A9               RX2/17[ ] |
+        | [ ]A10         TX1/INT3/18[ ] |
+        | [ ]A11         RX1/INT2/19[ ] |
+        | [ ]A12     I2C-SDA/INT1/20[ ] |
+        | [ ]A13     I2C-SCL/INT0/21[ ] |
+        | [ ]A14                        |
+        | [ ]A15                        |
+        |          RST SCK MISO         |
+        |     ICSP [ ] [ ] [ ]          |
+        |          [ ] [ ] [ ]          |
+        |          GND MOSI 5V          |
+        |                               |
+        |     2560          ____________/
+         \_________________/
 */
 //===================================================================================================================================================
 // Libraries for navigation system below
@@ -46,7 +46,8 @@
 #include <Wire.h>
 #include <TinyGPS.h>
 #include <SoftwareSerial.h>
-@@ -51,35 +6,21 @@
+#include <math.h>
+#include <Servo.h>
 #include <Adafruit_LSM303DLH_Mag.h>
 #include <Adafruit_Sensor.h>
 
@@ -60,43 +61,41 @@
 //===================================================================================================================================================
 // global variables and other items used by navigation system below
 
-float lat, lon;
-//GPS
+//float lat, lon;
 int year;
 byte month, day, hour, minute, second, hundredths;
-TinyGPS gps;
+//TinyGPS gps;
 
-float currentLat,
-      currentLong,
-      targetLat = 56.846468,
-      targetLong = 4.386233;
-int distanceToTarget,            // current distance to target (current waypoint)
-    originalDistanceToTarget;    // distance to original waypoing when we started navigating to it
 
 //Servo
 Servo fMotor, hMotor, vMotor1, vMotor2;
 
 // Object avoidance distances (in inches)
+#define echo 4
+#define trig 3
 #define SAFE_DISTANCE 4000
 #define MID_DISTANCE 2500
 #define STOP_DISTANCE 1000
 #define TURN_CW 1
 #define TURN_CCW 2
 #define TURN_STRAIGHT 0
-long sonarDistance, time;
-enum directions {cw = TURN_CW, ccw = TURN_CCW, straight = TURN_STRAIGHT} ;
-directions turnDirection = straight;
-Servo yawMotor;
-int pwmSignal;
-bool once = false;
+long time, sonarDistance;
 
 //Magnetometer
 int check = 1;
-@@ -88,51 +29,19 @@ int targetHeading;              // where we want to go to reach current waypoint
+Adafruit_LSM303DLH_Mag_Unified mag = Adafruit_LSM303DLH_Mag_Unified(12345);
+int targetHeading;              // where we want to go to reach current waypoint
 int currentHeading;             // where we are actually facing now
 int headingError;               // signed (+/-) difference between targetHeading and currentHeading
 float rotationAngle;
-#define HEADING_TOLERANCE 5     // tolerance +/- (in degrees) within which we don't attempt to turn to intercept targetHeading
+float headingDegrees;
+String direction;
+#define HEADING_TOLERANCE 10     // tolerance +/- (in degrees) within which we don't attempt to turn to intercept targetHeading
+#define TURN_CW 1
+#define TURN_CCW 2
+#define TURN_STRAIGHT 0
+enum directions {cw = TURN_CW, ccw = TURN_CCW, straight = TURN_STRAIGHT} ;
+directions turnDirection = straight;
 
 //GPS
 float currentLat,
@@ -128,14 +127,6 @@ const int leakVCC = 13; // leak pin
 #define DHTPIN 7     // what pin we're connected to
 #define DHTTYPE DHT22   // DHT 22  (AM2302)
 DHT dht(DHTPIN, DHTTYPE); //// Initialize DHT sensor for normal 16mhz Arduino
-float headingDegrees;
-String direction;
-#define HEADING_TOLERANCE 10     // tolerance +/- (in degrees) within which we don't attempt to turn to intercept targetHeading
-#define TURN_CW 1
-#define TURN_CCW 2
-#define TURN_STRAIGHT 0
-enum directions {cw = TURN_CW, ccw = TURN_CCW, straight = TURN_STRAIGHT} ;
-directions turnDirection = straight;
 
 //===================================================================================================================================================
 // Main function and loop
@@ -149,11 +140,12 @@ void setup() {
   txsetup();
   leaksetup();
   dhtsetup();
-  yawMotor.attach(8);
-
+  pinMode (trig, OUTPUT);
+  pinMode (echo, INPUT);
   if (!mag.begin()) {
     /* There was a problem detecting the LSM303 ... check your connections */
-@@ -141,41 +50,41 @@ void setup() {
+    Serial.println("Ooops, no LSM303 detected ... Check your wiring!");
+    while (1)
       ;
   }
 
@@ -161,7 +153,6 @@ void setup() {
   hMotor.writeMicroseconds(1500);
   vMotor1.writeMicroseconds(1500);
   vMotor2.writeMicroseconds(1500); // send "stop" signal to ESC.
-  yawMotor.writeMicroseconds(1500); // send "stop" signal to ESC.
   delay(7000); // delay to allow the ESC to recognize the stopped signal
 }
 
@@ -170,7 +161,6 @@ void loop() {
   while (Serial1.available() > 0) {
     if (gps.encode(Serial1.read())) {
       TXgps();
-      //gps.f_get_position(&lat, &lon);
       distanceToWaypoint();
       courseToWaypoint();
     }
@@ -189,29 +179,52 @@ void loop() {
 // Functions for navigation system below
 
 void checkSonar(void)
-int readCompass(void)
 {
-  time = pulseIn(4, HIGH);
+  digitalWrite(trig, LOW);
+  delayMicroseconds(2);
+  digitalWrite(trig, HIGH);
+  delayMicroseconds(10);
+  digitalWrite(trig, LOW);
+  time = pulseIn(echo, HIGH);
   sonarDistance = (time / 2) / 29.1;
 } // checkSonar()
-  sensors_event_t event;
-  mag.getEvent(&event);
-
-  float Pi = 3.14159;
-  // Calculate the angle of the vector y,x
-  float heading = (atan2(event.magnetic.y, event.magnetic.x) * 180) / Pi;
-  // Normalize to 0-360
-  if (heading < 0) {
-    heading = 360 + heading;
-  }
-
-  headingDegrees = heading;
-  return ((int)headingDegrees);
-}
 
 int distanceToWaypoint()
 {
-@@ -216,32 +125,6 @@ int courseToWaypoint()
+  float delta = radians(currentLong - targetLong);
+  float sdlong = sin(delta);
+  float cdlong = cos(delta);
+  float lat1 = radians(currentLat);
+  float lat2 = radians(targetLat);
+  float slat1 = sin(lat1);
+  float clat1 = cos(lat1);
+  float slat2 = sin(lat2);
+  float clat2 = cos(lat2);
+  delta = (clat1 * slat2) - (slat1 * clat2 * cdlong);
+  delta = sq(delta);
+  delta += sq(clat2 * sdlong);
+  delta = sqrt(delta);
+  float denom = (slat1 * slat2) + (clat1 * clat2 * cdlong);
+  delta = atan2(delta, denom);
+  distanceToTarget =  delta * 6372795;
+
+  return distanceToTarget;
+}
+
+int courseToWaypoint()
+{
+  float dlon = radians(targetLong - currentLong);
+  float cLat = radians(currentLat);
+  float tLat = radians(targetLat);
+  float a1 = sin(dlon) * cos(tLat);
+  float a2 = sin(cLat) * cos(tLat) * cos(dlon);
+  a2 = cos(cLat) * sin(tLat) - a2;
+  a2 = atan2(a1, a2);
+  if (a2 < 0.0)
+  {
+    a2 += TWO_PI;
+  }
+  targetHeading = degrees(a2);
   return targetHeading;
 }
 
@@ -244,12 +257,21 @@ int readCompass(void)
 void calcDesiredTurn(void)
 {
   // calculate where we need to turn to head to destination
-@@ -259,176 +142,37 @@ void calcDesiredTurn(void)
+  if (abs(currentHeading - targetHeading) > 180) {
+    if ((currentHeading - targetHeading) > 0) {
+      rotationAngle = 360 - (currentHeading - targetHeading);
+      rotationAngle = -rotationAngle;
+    }
+    else {
+      rotationAngle = 360 - abs(currentHeading - targetHeading);
+    }
+  }
+  else {
+    rotationAngle = currentHeading - targetHeading;
   }
   if (abs(rotationAngle) <= HEADING_TOLERANCE)      // if within tolerance, don't turn
     turnDirection = straight;
   else if (rotationAngle < 0)
-  else if (rotationAngle < 0) {
     turnDirection = cw;
   else if (rotationAngle > 0)
     turnDirection = ccw;
@@ -272,7 +294,6 @@ void moveAndAvoid(void)
       }
     }
     return;
-    direction = "cw";
   }
 
   if (sonarDistance > MID_DISTANCE && sonarDistance < SAFE_DISTANCE)    // not yet time to turn, but slow down
@@ -306,9 +327,6 @@ void moveAndAvoid(void)
     }
 
     return;
-  else if (rotationAngle > 0) {
-    turnDirection = ccw;
-    direction = "ccw";
   }
 
 
@@ -317,30 +335,18 @@ void moveAndAvoid(void)
     fMotor.writeMicroseconds(STOP);
     hMotor.writeMicroseconds(STOP);
     return;
-  else {
-    turnDirection = straight;
   }
 
 }
 
 void initialOrientation(void) {
   while (abs(rotationAngle) <= HEADING_TOLERANCE) {
-void orientation(void) {
-  if (abs(rotationAngle) > HEADING_TOLERANCE) {
-    bool once = true;
     if (turnDirection == cw) {
       hMotor.writeMicroseconds(map(abs(rotationAngle), 0, 180, 1500, 1900));
-      pwmSignal = map(abs(rotationAngle), 0, 180, 1600, 1900);
-      yawMotor.writeMicroseconds(pwmSignal);
-      Serial.println("Turning CW");
     }
     else if (turnDirection == ccw) {
       hMotor.writeMicroseconds(map(abs(rotationAngle), 0, 180, 1500, 1100));
-      pwmSignal = map(abs(rotationAngle), 0, 180, 1400, 1100);
-      yawMotor.writeMicroseconds(pwmSignal);
-      Serial.println("Turning CCW");
     }
-    Serial.println(pwmSignal);
   }
   check = 0;
 }
@@ -348,14 +354,14 @@ void orientation(void) {
 //============================================================================================================================================
 // Functions for communication and safety system below
 
-void leaksetup(){
+void leaksetup() {
   pinMode(leakVCC, OUTPUT);
-  digitalWrite(leakVCC, HIGH); 
+  digitalWrite(leakVCC, HIGH);
   pinMode(leakdigital, INPUT);
 }
 
-void dhtsetup(){
-    dht.begin();
+void dhtsetup() {
+  dht.begin();
 }
 
 // the setup function runs once when you press reset or power the board
@@ -380,7 +386,7 @@ void txsetup() {
 bool checkleak()
 {
   if (digitalRead(leakdigital) == LOW) {
-    Serial.println("Digital value : wet"); 
+    Serial.println("Digital value : wet");
     return true;
     delay (10);
   } else {
@@ -391,18 +397,18 @@ bool checkleak()
 
 bool checkfire()
 {
-    //Read data and store it to variables hum and temp
-    int hum = dht.readHumidity();
-    int temp = dht.readTemperature();
-    //Print temp and humidity values to serial monitor
-    Serial.print("Humidity: ");
-    Serial.print(hum);
-    Serial.print(" %, Temp: ");
-    Serial.print(temp);
-    Serial.println(" Celsius");
+  //Read data and store it to variables hum and temp
+  int hum = dht.readHumidity();
+  int temp = dht.readTemperature();
+  //Print temp and humidity values to serial monitor
+  Serial.print("Humidity: ");
+  Serial.print(hum);
+  Serial.print(" %, Temp: ");
+  Serial.print(temp);
+  Serial.println(" Celsius");
 
   if (temp >= firetemp) {
-    Serial.println("Fire on board"); 
+    Serial.println("Fire on board");
     return true;
     delay (10);
   } else {
@@ -421,23 +427,19 @@ void TXgps()
   String str = " ";
   if (gps.location.isValid())
   {
-  currentLat = gps.location.lat();
-  currentLong = gps.location.lng();
-  str = str + "$$$$$$$$ @@@@@@@@ ######## $$$$$$$$" + "Latitude: " + String(currentLat, 6) + "Longitude: " + String(currentLong, 6);
-  } else 
+    currentLat = gps.location.lat();
+    currentLong = gps.location.lng();
+    str = str + "$$$$$$$$ @@@@@@@@ ######## $$$$$$$$" + "Latitude: " + String(currentLat, 6) + "Longitude: " + String(currentLong, 6);
+  } else
   {
     str = str + "%$%$%$%$ Gps invalid ##@#@#@#";
   }
-  if (checkleak()==true){
+  if (checkleak() == true) {
     str = str + "Leak on board %#$$#$#$#$##$";
-  else if ((abs(rotationAngle) <= HEADING_TOLERANCE)) {
-    yawMotor.writeMicroseconds(1500);
-    delay(1000);
-    once = false;
   }
-  if (checkfire()==true){
+  if (checkfire() == true) {
     str = str + "Fire on board %#$$#$#$#$##$  ";
-  }  
+  }
   Serial.write((char*)str.c_str());
   trx.send_data(str);
   trx.set_trx_mode(TX_MODE);
