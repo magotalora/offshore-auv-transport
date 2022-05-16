@@ -44,13 +44,13 @@
 // Libraries for navigation system below
 
 #include <Wire.h>
-#include <TinyGPS.h>
 #include <SoftwareSerial.h>
 #include <math.h>
 #include <Servo.h>
 #include <Adafruit_LSM303DLH_Mag.h>
+#include <Adafruit_LSM303_Accel.h>
 #include <Adafruit_Sensor.h>
-
+#include <MatrixMath.h>
 //===================================================================================================================================================
 // Libraries for navigation and safety system below
 
@@ -65,6 +65,36 @@
 int year;
 byte month, day, hour, minute, second, hundredths;
 //TinyGPS gps;
+
+//Pressure sensor
+const int pressureInput = A0; //select the analog input pin for the pressure transducer
+const int pressureZero = 97; //analog reading of pressure transducer at 0psi
+const int pressureMax = 921.6; //analog reading of pressure transducer at 100psi
+const int pressuretransducermaxPSI = 145.04; //psi value of transducer being used
+const int baudRate = 9600; //constant integer to set the baud rate for serial monitor
+const int sensorreadDelay = 250; //constant integer to set the sensor read delay in milliseconds
+float pressureValue = 0; //variable to store the value coming from the pressure transducer
+float depth;
+
+bool underwater = false;
+Adafruit_LSM303_Accel_Unified accel = Adafruit_LSM303_Accel_Unified(54321);
+
+//millis
+unsigned long myTime = 0;
+unsigned long mylastTime;
+unsigned long timeDif;
+unsigned long prevMillis;
+
+//accelerometer
+float accel_x;
+float accel_y;
+float accel_z;
+
+//matrices
+mtx_type H[3][3];
+mtx_type v[3];
+mtx_type p[3];
+mtx_type pr[3];
 
 
 //Servo
@@ -83,7 +113,9 @@ long time, sonarDistance;
 
 //Magnetometer
 int check = 1;
+bool y = true;
 Adafruit_LSM303DLH_Mag_Unified mag = Adafruit_LSM303DLH_Mag_Unified(12345);
+int initHeading;
 int targetHeading;              // where we want to go to reach current waypoint
 int currentHeading;             // where we are actually facing now
 int headingError;               // signed (+/-) difference between targetHeading and currentHeading
@@ -100,6 +132,8 @@ directions turnDirection = straight;
 //GPS
 float currentLat,
       currentLong,
+      changeLat,
+      changeLong,
       targetLat,
       targetLong;
 int distanceToTarget,            // current distance to target (current waypoint)
@@ -109,10 +143,10 @@ int distanceToTarget,            // current distance to target (current waypoint
 #define FAST_SPEED 1900
 #define NORMAL_SPEED 1750
 #define TURN_SPEED 1675
+#define DIVE_SPEED 1650
 #define SLOW_SPEED 1600
 #define STOP 1500
 int speed = NORMAL_SPEED;
-
 
 //===================================================================================================================================================
 // global variables and other items used by communication and safety system below
@@ -142,13 +176,15 @@ void setup() {
   dhtsetup();
   pinMode (trig, OUTPUT);
   pinMode (echo, INPUT);
-  if (!mag.begin()) {
+  while (!mag.begin()) {
     /* There was a problem detecting the LSM303 ... check your connections */
     Serial.println("Ooops, no LSM303 detected ... Check your wiring!");
-    while (1)
-      ;
   }
-
+  while (!accel.begin())
+  {
+    /* There was a problem detecting the ADXL345 ... check your connections */
+    Serial.println("Ooops, no LSM303 detected ... Check your wiring!");
+  }
   fMotor.writeMicroseconds(1500);
   hMotor.writeMicroseconds(1500);
   vMotor1.writeMicroseconds(1500);
@@ -159,7 +195,20 @@ void setup() {
 void loop() {
   // put your main code here, to run repeatedly:
   while (Serial1.available() > 0) {
-    if (gps.encode(Serial1.read())) {
+    if ((!gps.location.isValid()) || underwater) {
+      prevMillis = millis();
+      while (millis() - prevMillis <= 60000) {
+        read_accel();
+        underwaterCoordinates();
+        distanceToWaypoint();
+        courseToWaypoint();
+        currentHeading = readCompass();
+        checkSonar();
+        moveAndAvoid();
+      }
+      resurface();
+    }
+    else if (gps.encode(Serial1.read())) {
       TXgps();
       distanceToWaypoint();
       courseToWaypoint();
@@ -228,6 +277,14 @@ int courseToWaypoint()
   return targetHeading;
 }
 
+void readDepth() {
+  pressureValue = analogRead(pressureInput); //reads value from input pin and assigns to variable
+  pressureValue = ((pressureValue - pressureZero) * pressuretransducermaxPSI) / (pressureMax - pressureZero); //conversion equation to convert analog reading to psi
+  delay(sensorreadDelay); //delay in milliseconds between read values
+  float pascals = pressureValue * 6894.7572932;
+  depth = pascals / 10045;
+}
+
 int readCompass(void)
 {
   sensors_event_t event;
@@ -278,8 +335,10 @@ void calcDesiredTurn(void)
   else
     turnDirection = straight;
 }
+
 void moveAndAvoid(void)
 {
+  bool y = true;
   if (sonarDistance >= SAFE_DISTANCE)       // no close objects in front of car
   {
     if (turnDirection == straight)
@@ -330,13 +389,68 @@ void moveAndAvoid(void)
   }
 
 
-  if (sonarDistance <  STOP_DISTANCE)          // too close, stop and back up
+  if ((sonarDistance <=  STOP_DISTANCE) && (!underwater))        // too close, stop and back up
   {
-    fMotor.writeMicroseconds(STOP);
-    hMotor.writeMicroseconds(STOP);
-    return;
+    if (!underwater) {
+      fMotor.writeMicroseconds(STOP);
+      hMotor.writeMicroseconds(STOP);
+      while ((sonarDistance <  STOP_DISTANCE) && (depth < 10)) {
+        readDepth();
+        checkSonar();
+        vMotor1.writeMicroseconds(1900);
+        vMotor2.writeMicroseconds(1900);
+      }
+      vMotor1.writeMicroseconds(1500);
+      vMotor2.writeMicroseconds(1500);
+      underwater = true;
+      return;
+    }
+    else {
+      fMotor.writeMicroseconds(1500);
+      delay(2000);
+      initHeading = currentHeading;
+      while (true) {
+        currentHeading = readCompass();
+        if ((abs(currentHeading - initHeading) <= 90)) { //true - left; false = right
+          hMotor.writeMicroseconds(1900);
+          if (sonarDistance > STOP_DISTANCE) {
+            hMotor.writeMicroseconds(1500);
+            delay(1500);
+            y = false;
+            break;
+          }
+        }
+        else {
+          break;
+        }
+      }
+      while (y) {
+        if ((abs(currentHeading - initHeading) <= 180)) {
+          hMotor.writeMicroseconds(1100);
+          if (sonarDistance > STOP_DISTANCE) {
+            hMotor.writeMicroseconds(1500);
+            delay(1500);
+            y = true;
+            break;
+          }
+        }
+      }
+    }
   }
+}
 
+void resurface() {
+  fMotor.writeMicroseconds(1500);
+  delay(1000);
+  while (depth >= 1) {
+    readDepth();
+    vMotor1.writeMicroseconds(1100);
+    vMotor2.writeMicroseconds(1100);
+  }
+  vMotor1.writeMicroseconds(1500);
+  vMotor2.writeMicroseconds(1500);
+  delay(1000);
+  underwater = false;
 }
 
 void initialOrientation(void) {
@@ -351,6 +465,41 @@ void initialOrientation(void) {
   check = 0;
 }
 
+void read_accel() {
+  sensors_event_t event;
+  accel.getEvent(&event);
+
+  accel_x = event.acceleration.x;
+  accel_y = event.acceleration.y;
+  accel_z = event.acceleration.z;
+
+  mylastTime = myTime;
+  myTime = millis();
+  timeDif = myTime - mylastTime;
+
+  v[1] = v[1] + accel_x * (timeDif / 1000); //first integration to velocity in m/s
+  v[2] = v[2] + accel_y * (timeDif / 1000);
+  v[3] = v[3] + accel_z * (timeDif / 1000);
+
+  p[1] = p[1] + v[1] * (timeDif / 1000);    //second integration to position in m
+  p[2] = p[2] + v[2] * (timeDif / 1000);
+  p[3] = p[3] + v[3] * (timeDif / 1000);
+}
+
+void underwaterCoordinates() {
+
+  H[1][1] = cos(currentHeading);  H[1][2] = -sin(currentHeading);   H[1][3] = 0;    //rotation matrix for rotating around z axis
+  H[2][1] = sin(currentHeading);  H[2][2] = cos(currentHeading);    H[2][3] = 0;
+  H[3][1] = 0;             H[3][2] = 0;               H[3][3] = 1;
+
+  Matrix.Multiply((mtx_type*) H, (mtx_type*) p, 3, 3, 1, (mtx_type*) pr);
+
+  changeLat = radians(pr[1] / 111000); //length of a degree of arc of latitude and longitude is about 111000 meters
+  changeLong = radians(pr[2] / 111000);
+
+  currentLong = currentLong + changeLong;
+  currentLat = currentLat + changeLat;
+}
 //============================================================================================================================================
 // Functions for communication and safety system below
 
