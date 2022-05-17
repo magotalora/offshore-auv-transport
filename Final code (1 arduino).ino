@@ -61,34 +61,34 @@
 //===================================================================================================================================================
 // global variables and other items used by navigation system below
 
-//float lat, lon;
-int year;
-byte month, day, hour, minute, second, hundredths;
-//TinyGPS gps;
-
 //Pressure sensor
-const int pressureInput = A0; //select the analog input pin for the pressure transducer
-const int pressureZero = 97; //analog reading of pressure transducer at 0psi
-const int pressureMax = 921.6; //analog reading of pressure transducer at 100psi
-const int pressuretransducermaxPSI = 145.04; //psi value of transducer being used
-const int baudRate = 9600; //constant integer to set the baud rate for serial monitor
-const int sensorreadDelay = 250; //constant integer to set the sensor read delay in milliseconds
-float pressureValue = 0; //variable to store the value coming from the pressure transducer
+const int pressureInput = A0;
+//select the analog input pin for the pressure transducer
+const int pressureZero = 97;
+//analog reading of pressure transducer at 0psi
+const int pressureMax = 921.6;
+//analog reading of pressure transducer at 100psi
+const int pressuretransducermaxPSI = 145.04;
+//psi value of transducer being used
+const int baudRate = 9600;
+//constant integer to set the baud rate for serial monitor
+const int sensorreadDelay = 250;
+//constant integer to set the sensor read delay in milliseconds
+float pressureValue = 0;
+//variable to store the value coming from the pressure transducer
 float depth;
 
-bool underwater = false;
+//accelerometer
 Adafruit_LSM303_Accel_Unified accel = Adafruit_LSM303_Accel_Unified(54321);
+float accel_x;
+float accel_y;
+float accel_z;
 
 //millis
 unsigned long myTime = 0;
 unsigned long mylastTime;
 unsigned long timeDif;
 unsigned long prevMillis;
-
-//accelerometer
-float accel_x;
-float accel_y;
-float accel_z;
 
 //matrices
 mtx_type H[3][3];
@@ -97,8 +97,16 @@ mtx_type p[3];
 mtx_type pr[3];
 
 
-//Servo
+//Motors
 Servo fMotor, hMotor, vMotor1, vMotor2;
+int motorPin[] = {13, 14, 15, 16}; //Pins that will control the On/Off of the four motors
+#define FAST_SPEED 1900
+#define NORMAL_SPEED 1750
+#define TURN_SPEED 1675
+#define DIVE_SPEED 1650
+#define SLOW_SPEED 1600
+#define STOP 1500
+int speed = NORMAL_SPEED;
 
 // Object avoidance distances (in inches)
 #define echo 4
@@ -109,7 +117,8 @@ Servo fMotor, hMotor, vMotor1, vMotor2;
 #define TURN_CW 1
 #define TURN_CCW 2
 #define TURN_STRAIGHT 0
-long time, sonarDistance;
+long timer, sonarDistance;
+bool underwater = false;
 
 //Magnetometer
 int check = 1;
@@ -138,15 +147,6 @@ float currentLat,
       targetLong;
 int distanceToTarget,            // current distance to target (current waypoint)
     originalDistanceToTarget;    // distance to original waypoing when we started navigating to it
-
-//Motors
-#define FAST_SPEED 1900
-#define NORMAL_SPEED 1750
-#define TURN_SPEED 1675
-#define DIVE_SPEED 1650
-#define SLOW_SPEED 1600
-#define STOP 1500
-int speed = NORMAL_SPEED;
 
 //===================================================================================================================================================
 // global variables and other items used by communication and safety system below
@@ -184,6 +184,9 @@ void setup() {
   {
     /* There was a problem detecting the ADXL345 ... check your connections */
     Serial.println("Ooops, no LSM303 detected ... Check your wiring!");
+  }
+  for (int i = 0; i <= sizeof(motorPin); i++) {
+    pinMode(i, OUTPUT);
   }
   fMotor.writeMicroseconds(1500);
   hMotor.writeMicroseconds(1500);
@@ -234,8 +237,8 @@ void checkSonar(void)
   digitalWrite(trig, HIGH);
   delayMicroseconds(10);
   digitalWrite(trig, LOW);
-  time = pulseIn(echo, HIGH);
-  sonarDistance = (time / 2) / 29.1;
+  timer = pulseIn(echo, HIGH);
+  sonarDistance = (timer / 2) / 29.1;
 } // checkSonar()
 
 int distanceToWaypoint()
@@ -389,12 +392,15 @@ void moveAndAvoid(void)
   }
 
 
-  if ((sonarDistance <=  STOP_DISTANCE) && (!underwater))        // too close, stop and back up
+  if ((sonarDistance <=  STOP_DISTANCE))        // too close
   {
     if (!underwater) {
       fMotor.writeMicroseconds(STOP);
       hMotor.writeMicroseconds(STOP);
       while ((sonarDistance <  STOP_DISTANCE) && (depth < 10)) {
+        armMotor(2, HIGH);
+        armMotor(3, HIGH);
+        delay(1000);
         readDepth();
         checkSonar();
         vMotor1.writeMicroseconds(1900);
@@ -402,6 +408,8 @@ void moveAndAvoid(void)
       }
       vMotor1.writeMicroseconds(1500);
       vMotor2.writeMicroseconds(1500);
+      armMotor(2, LOW);
+      armMotor(3, LOW);
       underwater = true;
       return;
     }
@@ -411,7 +419,7 @@ void moveAndAvoid(void)
       initHeading = currentHeading;
       while (true) {
         currentHeading = readCompass();
-        if ((abs(currentHeading - initHeading) <= 90)) { //true - left; false = right
+        if ((abs(currentHeading - initHeading) <= 90)) {
           hMotor.writeMicroseconds(1900);
           if (sonarDistance > STOP_DISTANCE) {
             hMotor.writeMicroseconds(1500);
@@ -594,4 +602,26 @@ void TXgps()
   trx.set_trx_mode(TX_MODE);
   Serial.println();
   delay(1000);
+}
+
+void armMotor(int motorNum, bool state) {
+  //If we want to arm the motor, first we send 1500 microseconds to the servo object
+  if (state == HIGH) {
+    switch (motorNum) {
+      case 0:
+        digitalWrite(2, HIGH);
+        fMotor.writeMicroseconds(1500);
+        break;
+      case 1:
+        hMotor.writeMicroseconds(1500);
+        break;
+      case 2:
+        vMotor1.writeMicroseconds(1500);
+      case 3:
+        vMotor2.writeMicroseconds(1500);
+        break;
+    }
+  }
+  //Then for both arm or disarm we will send the cosen state to the On/Off pin
+  digitalWrite(motorPin[motorNum], state);
 }
